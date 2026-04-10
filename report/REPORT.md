@@ -123,14 +123,14 @@ Dùng `max_sentences_per_chunk=3` cho SentenceChunker; baseline là `fixed_size(
 
 | Thành viên | Strategy | Params | Retrieval Pass Rate | Điểm mạnh | Điểm yếu |
 |-----------|----------|--------|--------------------|-----------|---------  |
-| Hiền | FixedSize | size=256, overlap=20%, top_k=3 | 80% | Chunk nhỏ, precision cao | Cắt giữa câu, mất ngữ cảnh |
-| Hiển | FixedSize | size=512, overlap=30%, top_k=5 | 80% | Overlap lớn giảm mất context | Chunk to, nhiều nhiễu |
-| **Tôi (Lương Thanh Hậu)** | **SentenceChunker** | **3 câu/chunk, top_k=3** | **100%** | **Trọn vẹn từng câu, ngữ nghĩa cô đọng** | **Chunk count nhiều hơn, tốn bộ nhớ** |
-| Dương | Recursive | size=400, separators mặc định, top_k=4 | 100% | Linh hoạt theo cấu trúc văn bản | Chunk size không đều |
-| An | Recursive | size=700, separators mặc định, top_k=5 | 100% | Context dài, đủ thông tin | Chunk to, nhiều nội dung thừa |
+| Hiền | FixedSize | size=256, overlap=20%, top_k=3 | 80% (4/5) | Chunk nhỏ, bắt keyword tốt | Cắt giữa câu, dễ vỡ ngữ cảnh; query "vượt biển" fail |
+| Hiển | FixedSize | size=512, overlap=30%, top_k=5 | 20% (1/5 pass) | Overlap lớn giảm mất context | Lệch source ở 4/5 queries; top-1 đúng duy nhất cho Q4 (Mẫn Huy) |
+| **Tôi (Lương Thanh Hậu)** | **SentenceChunker** | **3 câu/chunk, top_k=3** | **80% (4/5 pass)** | **Trọn vẹn từng câu, ngữ nghĩa cô đọng** | **Chunk count nhiều hơn; Q2 lệch source — retrieve chunk tiệc công ty thay vì blog** |
+| Dương | Recursive | size=400, separators mặc định, top_k=4 | 100% (5/5) | Truy hồi ổn định hơn với văn bản dài | Chunk size không đều |
+| An | Recursive | size=700, separators mặc định, top_k=5 | 100% (5/5) | Mạnh ở truy hồi theo ngữ cảnh dài; score cao (0.65–0.77) | Chunk to, nhiều nội dung thừa |
 
 **Strategy nào tốt nhất cho domain này? Tại sao?**
-> SentenceChunker (3 câu/chunk) phù hợp nhất cho truyện ngắn tình cảm Việt Nam vì câu văn trong domain này cô đọng, mỗi câu mang một ý cảm xúc rõ ràng. Nhóm 3 câu tạo ra chunk đủ ngữ cảnh (không quá ngắn) nhưng đủ chính xác (không quá dài). Kết quả 100% pass rate với top_k=3 xác nhận rằng tôn trọng ranh giới câu giúp embedding nắm bắt ngữ nghĩa tốt hơn so với cắt cố định theo ký tự.
+> SentenceChunker (3 câu/chunk) phù hợp nhất cho truyện ngắn tình cảm Việt Nam vì câu văn trong domain này cô đọng, mỗi câu mang một ý cảm xúc rõ ràng. Nhóm 3 câu tạo ra chunk đủ ngữ cảnh (không quá ngắn) nhưng đủ chính xác (không quá dài). Kết quả 80% pass rate (4/5) với top_k=3, vượt trội so với FixedSize nhưng thua kém Recursive ở Q2 — cho thấy ranh giới câu giúp embedding nắm bắt ngữ nghĩa tốt hơn cắt ký tự cố định, đặc biệt với query cảm xúc.
 
 ---
 
@@ -244,17 +244,17 @@ Tổng chunks: FixedSize(256,ov=20%)=1892 / FixedSize(512,ov=30%)=841 / **Senten
 | # | Query | Gold Answer |
 |---|-------|-------------|
 | 1 | Trong "Anh đừng lỗi hẹn", tại sao Thuý Hằng li dị chồng và nguyên nhân nào dẫn đến bệnh tim? | Hằng li dị vì hôn nhân đổ vỡ; bệnh tim xuất phát từ những tổn thương tâm lý kéo dài sau chia tay. |
-| 2 | Nhân vật "tôi" gặp người con trai trong truyện qua phương tiện nào? | Họ gặp nhau trong môi trường xã hội/thực tế, không qua mạng. |
+| 2 | Nhân vật "tôi" gặp người con trai trong truyện qua phương tiện nào? | Qua blog, sau đó trao đổi qua comment/email/điện thoại. |
 | 3 | Hai nhân vật đã ở bên nhau bao lâu trước khi chia tay tại sân bay? | Họ chỉ có 48 giờ bên nhau trước khi chia tay. |
 | 4 | Vì sao Mẫn Huy bỏ nhà ra đi? | Mẫn Huy bỏ đi vì xung đột nội tâm và những bất đồng không thể hòa giải trong gia đình. |
-| 5 | Vì sao nhân vật quyết vượt biển? | Nhân vật vượt biển để tìm tự do và một cuộc sống mới cùng người thân yêu. |
+| 5 | Vì sao nhân vật quyết vượt biển? | Ẩn dụ "vượt cạn" trong ca sinh khó. |
 
 ### Kết Quả Của Tôi (SentenceChunker, 3 câu/chunk, top_k=3)
 
 | # | Query | Top-1 Retrieved Chunk (tóm tắt) | Score | Relevant? |
 |---|-------|--------------------------------|-------|-----------|
 | 1 | Hằng li dị chồng & bệnh tim? | "Anh đừng lỗi hẹn — và lịm đi trong một cơn đau đớn. Trái tim chị tổn thương..." | **0.801** | Có |
-| 2 | Gặp người con trai qua phương tiện nào? | "48 giờ yêu nhau — anh ấy tiến lại gần tôi trong buổi tiệc công ty..." | **0.694** | Có |
+| 2 | Gặp người con trai qua phương tiện nào? | "48 giờ yêu nhau — anh ấy tiến lại gần tôi trong buổi tiệc công ty..." | **0.694** | Không |
 | 3 | Ở bên nhau bao lâu trước khi chia tay sân bay? | "48 giờ yêu nhau — chúng tôi chỉ có 48 tiếng đồng hồ ngắn ngủi..." | **0.725** | Có |
 | 4 | Vì sao Mẫn Huy bỏ nhà ra đi? | "Anh Sẽ Đến — Bất ngờ trước những lời Mẫn Huy vừa thốt lên, Hồng Cát bối rối..." | **0.787** | Có |
 | 5 | Vì sao nhân vật quyết vượt biển? | "Anh ơi, cùng nhau ta vượt biển — Áo Vàng. Vì anh, vì tương lai của chúng ta..." | **0.619** | Có |
@@ -264,12 +264,12 @@ Tổng chunks: FixedSize(256,ov=20%)=1892 / FixedSize(512,ov=30%)=841 / **Senten
 | Thành viên | Strategy | Params | Pass | Fail | Pass Rate |
 |-----------|----------|--------|------|------|-----------|
 | Hiền | FixedSize | size=256, ov=20%, top_k=3 | 4 | 1 | 80% |
-| Hiển | FixedSize | size=512, ov=30%, top_k=5 | 4 | 1 | 80% |
-| **Tôi (Hậu)** | **SentenceChunker** | **3 câu/chunk, top_k=3** | **5** | **0** | **100%** |
+| Hiển | FixedSize | size=512, ov=30%, top_k=5 | 1 | 4 | 20% |
+| **Tôi (Hậu)** | **SentenceChunker** | **3 câu/chunk, top_k=3** | **4** | **1** | **80%** |
 | Dương | Recursive | size=400, top_k=4 | 5 | 0 | 100% |
 | An | Recursive | size=700, top_k=5 | 5 | 0 | 100% |
 
-> **Nhận xét:** SentenceChunker(3 câu/chunk) với top_k=3 đạt **5/5 queries pass**. Query 5 ("vượt biển") là điểm phân biệt giữa các strategies — FixedSize(256) và FixedSize(512) fail (score < 0.6) vì cắt giữa đoạn làm mất tiêu đề truyện, trong khi SentenceChunker giữ nguyên câu văn hoàn chỉnh trong chunk nên score đạt 0.619 ≥ threshold. Strategy của tôi cho kết quả ổn định nhất trong nhóm FixedSize, đặc biệt với các query cảm xúc — embedding nắm bắt tone câu rõ ràng hơn khi chunk là đơn vị câu hoàn chỉnh thay vì ký tự cố định.
+> **Nhận xét:** SentenceChunker(3 câu/chunk) với top_k=3 đạt **4/5 queries pass**. Q2 fail vì chunk được retrieve từ "48 giờ yêu nhau" mô tả gặp nhau tại tiệc công ty, trong khi gold answer (nhóm thống nhất) là gặp qua blog — embedding score cao (0.694) nhưng nội dung không đúng. Q5 ("vượt biển") pass với score 0.619 ≥ threshold vì SentenceChunker giữ nguyên câu hoàn chỉnh giúp chunk khớp với nguồn đúng. So với FixedSize (Hiển 20%, Hiền 80%), SentenceChunker cho kết quả tốt hơn nhờ tôn trọng ranh giới câu.
 
 ---
 
